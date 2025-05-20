@@ -115,7 +115,7 @@
             
             <div class="form-group">
                 <label for="phone">전화번호</label>
-                <input type="tel" id="phone" name="phone" placeholder="010-0000-0000" required>
+                <input type="tel" id="phone" name="phone" placeholder="01000000000" required>
             </div>
             
             <div class="btn-container">

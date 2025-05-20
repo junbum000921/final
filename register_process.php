@@ -6,6 +6,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username  = trim($_POST['name']);       // 실제 이름
     $useremail = trim($_POST['email']);      // 이메일
     $userpw    = password_hash(trim($_POST['password']), PASSWORD_DEFAULT); // 비밀번호 해싱
+    $phonenum  = trim($_POST['phone']);      // 전화번호
 
     // 아이디 중복 확인
     $check_stmt = $conn->prepare("SELECT userid FROM usertbl WHERE userid = ?");
@@ -20,8 +21,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
               </script>";
     } else {
         // 회원 정보 삽입
-        $insert_stmt = $conn->prepare("INSERT INTO usertbl (userid, username, email, password) VALUES (?, ?, ?, ?)");
-        $insert_stmt->bind_param("ssss", $userid, $username, $useremail, $userpw);
+        $insert_stmt = $conn->prepare("INSERT INTO usertbl (userid, username, email, password, phonenum) VALUES (?, ?, ?, ?, ?)");
+        $insert_stmt->bind_param("sssss", $userid, $username, $useremail, $userpw, $phonenum);
 
         if ($insert_stmt->execute()) {
             // datatbl에도 userid, username 추가
