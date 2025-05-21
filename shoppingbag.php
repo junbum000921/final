@@ -64,22 +64,6 @@
       margin-bottom: 30px;
     }
     
-    .start-shopping-btn {
-      background: linear-gradient(to right, #6e8efb, #a777e3);
-      color: white;
-      border: none;
-      padding: 15px 30px;
-      border-radius: 30px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    
-    .start-shopping-btn:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    }
-    
     .back-button {
       position: absolute;
       left: 20px;
@@ -106,6 +90,9 @@
 </head>
 <body>
   <?php
+  // 세션 시작
+  session_start();
+  
   // DB 연결 정보
   $host = "127.0.0.1";
   $db = "famarket";
@@ -115,22 +102,27 @@
   // 사용자 정보 가져오기
   $username = "고객";  // 기본값
   
-  try {
-    // DB 연결
-    $conn = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
-    // 가장 최근 입장한 사용자 정보 가져오기
-    $stmt = $conn->query("SELECT u.username FROM entertbl e 
-                         JOIN usertbl u ON e.phonenum = u.phonenum 
-                         ORDER BY e.enter_time DESC LIMIT 1");
-    $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($user_data && isset($user_data['username'])) {
-      $username = $user_data['username'];
+  // 세션에서 전화번호 가져오기
+  $input_phonenum = $_SESSION['phonenum'] ?? '';
+  
+  if (!empty($input_phonenum)) {
+    try {
+      // DB 연결
+      $conn = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
+      $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+      
+      // 전화번호로 사용자 이름 조회
+      $stmt = $conn->prepare("SELECT username FROM usertbl WHERE phonenum = :phonenum");
+      $stmt->bindParam(':phonenum', $input_phonenum);
+      $stmt->execute();
+      $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
+      
+      if ($user_data && isset($user_data['username'])) {
+        $username = $user_data['username'];
+      }
+    } catch (PDOException $e) {
+      // 오류 발생 시 기본값 사용
     }
-  } catch (PDOException $e) {
-    // 오류 발생 시 기본값 사용
   }
   ?>
 
@@ -148,16 +140,7 @@
         <i class="fas fa-shopping-bag"></i>
       </div>
       <div class="empty-message">담은 상품이 없습니다.</div>
-      <button class="start-shopping-btn">쇼핑 시작하기</button>
     </div>
   </div>
-  
-  <script>
-    // 쇼핑 시작하기 버튼 클릭 이벤트
-    document.querySelector('.start-shopping-btn').addEventListener('click', function() {
-      // 여기에 쇼핑 페이지로 이동하는 코드 추가
-      alert('쇼핑 기능은 아직 구현되지 않았습니다.');
-    });
-  </script>
 </body>
 </html>
