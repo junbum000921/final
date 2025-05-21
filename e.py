@@ -277,58 +277,87 @@ class FaceRecognitionApp(QMainWindow):
     def recognize_face(self):
         if not self.cap or not self.cap.isOpened():
             return
-        ret, frame = self.cap.read()
-        if not ret:
-            return
-        frame = cv2.flip(frame, 1)
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.face_mesh.process(frame_rgb)
+    
+        try:  # 전체 함수를 try 블록으로 감싸기
+            ret, frame = self.cap.read()
+            if not ret:
+                return
+            frame = cv2.flip(frame, 1)
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = self.face_mesh.process(frame_rgb)
 
-        if results.multi_face_landmarks:
-            current_face_vector = []
-            for face_landmarks in results.multi_face_landmarks:
-                for landmark in face_landmarks.landmark:
-                    current_face_vector.extend([landmark.x, landmark.y, landmark.z])
-            try:
-                conn = mysql.connector.connect(
-                    host="127.0.0.1",
-                    user="famarket",
-                    password="qpalzm1029!",
-                    database="famarket"
-                )
-                cursor = conn.cursor()
-                cursor.execute("SELECT userid, username, uservector FROM datatbl WHERE uservector IS NOT NULL")
-                users = cursor.fetchall()
-                best_match, best_similarity = None, -1
-                for userid, username, uservector_blob in users:
-                    try:
-                        stored_vectors = pickle.loads(uservector_blob)
-                        for stored_vector in stored_vectors:
-                            similarity = self.calculate_similarity(current_face_vector, stored_vector)
-                            if similarity > best_similarity and similarity > 0.85:
-                                best_similarity = similarity
-                                best_match = (userid, username)
-                    except:
-                        continue
-                cursor.close()
-                conn.close()
-                if best_match:
-                    _, username = best_match
-                    self.status_label.setText(f"환영합니다, {username}님!")
-                    QMessageBox.information(self, "성공", f"{username}님 환영합니다!")
-                    self.timer.stop()
-                    if self.cap:
-                        self.cap.release()
-                        self.cap = None
-                    self.setup_main_ui()
-                else:
-                    self.status_label.setText("일치하는 사용자를 찾을 수 없습니다.")
-                    QMessageBox.warning(self, "실패", "등록된 사용자가 없습니다.")
-            except Exception as e:
-                print(traceback.format_exc())
-                QMessageBox.critical(self, "오류", f"DB 오류 발생: {str(e)}")
-        else:
-            QMessageBox.warning(self, "경고", "얼굴을 감지할 수 없습니다.")
+            if results.multi_face_landmarks:
+                current_face_vector = []
+                for face_landmarks in results.multi_face_landmarks:
+                    for landmark in face_landmarks.landmark:
+                        current_face_vector.extend([landmark.x, landmark.y, landmark.z])
+                
+                # 데이터베이스 연결 부분
+                conn = None
+                try:
+                    conn = mysql.connector.connect(
+                        host="127.0.0.1",
+                        user="famarket",
+                        password="qpalzm1029!",
+                        database="famarket"
+                    )
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT userid, username, uservector FROM datatbl WHERE uservector IS NOT NULL")
+                    users = cursor.fetchall()
+                    best_match, best_similarity = None, -1
+                    
+                    for userid, username, uservector_blob in users:
+                        try:
+                            stored_vectors = pickle.loads(uservector_blob)
+                            for stored_vector in stored_vectors:
+                                similarity = self.calculate_similarity(current_face_vector, stored_vector)
+                                if similarity > best_similarity and similarity > 0.85:
+                                    best_similarity = similarity
+                                    best_match = (userid, username)
+                        except Exception as e:
+                            print(f"벡터 처리 오류: {str(e)}")
+                            continue
+                    
+                    if best_match:
+                        userid, username = best_match
+                        self.status_label.setText(f"환영합니다, {username}님!")
+                        QMessageBox.information(self, "성공", f"{username}님 환영합니다!")
+
+                        # 입장 기록 저장
+                        try:
+                            if conn.is_connected():
+                                cursor.execute("SELECT phonenum FROM usertbl WHERE userid = %s", (userid,))
+                                result = cursor.fetchone()
+                                if result:
+                                    phonenum = result[0]
+                                    cursor.execute("INSERT INTO entertbl (phonenum, enter_time) VALUES (%s,NOW())", (phonenum,))
+                                    conn.commit()
+                            self.timer.stop()
+                            if self.cap:
+                                self.cap.release()
+                                self.cap = None
+                            self.setup_main_ui()
+                        except Exception as e:
+                            print(f"입장 기록 저장 오류: {str(e)}")
+                            QMessageBox.warning(self, "DB 오류", f"입장 기록 저장 중 오류 발생: {str(e)}")
+                    else:
+                        self.status_label.setText("인식 실패: 등록된 사용자를 찾을 수 없습니다.")
+                        QMessageBox.warning(self, "실패", "등록된 얼굴과 일치하지 않습니다.")
+                except Exception as e:
+                    print(f"데이터베이스 오류: {str(e)}")
+                    self.status_label.setText(f"데이터베이스 오류: {str(e)}")
+                finally:
+                    if cursor:
+                        cursor.close()
+                    if conn and conn.is_connected():
+                        conn.close()
+            else:
+                self.status_label.setText("얼굴을 감지할 수 없습니다.")
+                QMessageBox.warning(self, "경고", "카메라에 얼굴이 명확히 보이도록 해주세요.")
+        except Exception as e:
+            print(f"얼굴 인식 오류: {str(e)}")
+            self.status_label.setText(f"얼굴 인식 중 오류 발생: {str(e)}")
+
 
     def calculate_similarity(self, vector1, vector2):
         min_len = min(len(vector1), len(vector2))
