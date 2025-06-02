@@ -117,6 +117,17 @@
       $stmt->execute();
       $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
       
+      // 전화번호로 userid도 조회
+      $stmt = $conn->prepare("SELECT username, userid FROM usertbl WHERE phonenum = :phonenum");
+      $stmt->bindParam(':phonenum', $input_phonenum);
+      $stmt->execute();
+      $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+      if ($user_data) {
+        $username = $user_data['username'];
+        $_SESSION['userid'] = $user_data['userid'];  // 이 줄을 추가
+      }
+
       if ($user_data && isset($user_data['username'])) {
         $username = $user_data['username'];
       }
@@ -142,5 +153,62 @@
       <div class="empty-message">담은 상품이 없습니다.</div>
     </div>
   </div>
+
+  <div style="text-align: center; margin-top: 20px;">
+    <form action="pay.php" method="POST">
+      <button type="submit" style="padding: 10px 20px; font-size: 18px; background-color: #6e8efb; color: white; border: none; border-radius: 8px; cursor: pointer;">
+        결제하기
+      </button>
+    </form>
+  </div>
+<script>
+function updateShoppingBag() {
+  fetch("get_shoppingbag.php")
+    .then(response => response.json())
+    .then(data => {
+      const bag = document.querySelector(".shopping-bag");
+      bag.innerHTML = ""; // 초기화
+
+      if (data.length === 0) {
+        bag.innerHTML = `
+          <div class="empty-bag-icon"><i class="fas fa-shopping-bag"></i></div>
+          <div class="empty-message">담은 상품이 없습니다.</div>`;
+        return;
+      }
+
+      let html = `<h2 style="margin-bottom: 20px;">🛍️ 담은 상품 목록</h2>`;
+      html += `<table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background-color: #f1f3f5;">
+            <th style="padding: 10px;">상품명</th>
+            <th style="padding: 10px;">수량</th>
+            <th style="padding: 10px;">총 가격</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+      data.forEach(item => {
+        html += `<tr>
+          <td style="padding: 10px;">${item.itemname}</td>
+          <td style="padding: 10px; text-align: center;">${item.itemnum}</td>
+          <td style="padding: 10px; text-align: right;">${item.totalprice.toLocaleString()} 원</td>
+        </tr>`;
+      });
+
+      html += `</tbody></table>`;
+      bag.innerHTML = html;
+    })
+    .catch(error => {
+      console.error("장바구니 불러오기 오류:", error);
+    });
+}
+
+// 1초마다 장바구니 업데이트
+setInterval(updateShoppingBag, 1000);
+
+// 페이지 로딩 시 첫 실행
+window.onload = updateShoppingBag;
+</script>
+
 </body>
 </html>
